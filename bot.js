@@ -7,7 +7,7 @@ const path = require("path");
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const DB_FILE = path.join("/tmp", "bot_data.json");
+const DB_FILE = path.join(__dirname, "bot_data.json");
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 const groq = new Groq({ apiKey: GROQ_API_KEY });
