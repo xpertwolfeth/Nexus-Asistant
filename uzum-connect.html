@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus — Подключить Uzum</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 16px; padding: 32px; max-width: 480px; width: 100%; }
+  .logo { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .logo span { color: #6366f1; }
+  .subtitle { color: #888; font-size: 14px; margin-bottom: 32px; }
+  .step { display: flex; gap: 16px; margin-bottom: 24px; align-items: flex-start; }
+  .step-num { width: 32px; height: 32px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; flex-shrink: 0; }
+  .step-text { font-size: 14px; color: #ccc; line-height: 1.6; padding-top: 6px; }
+  .step-text b { color: #fff; }
+  .btn-main { width: 100%; padding: 14px; background: #6366f1; border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background 0.2s; }
+  .btn-main:hover { background: #5558e8; }
+  .btn-main:disabled { background: #333; color: #666; cursor: default; }
+  .result-box { background: #111; border: 1px solid #333; border-radius: 10px; padding: 14px; margin-top: 16px; display: none; }
+  .result-label { font-size: 12px; color: #888; margin-bottom: 8px; }
+  .result-token { font-size: 12px; color: #6ee7b7; font-family: monospace; word-break: break-all; line-height: 1.6; }
+  .btn-copy { width: 100%; padding: 10px; background: #1f2937; border: 1px solid #374151; border-radius: 8px; color: #fff; font-size: 14px; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
+  .btn-copy:hover { background: #374151; }
+  .status { font-size: 13px; color: #6ee7b7; margin-top: 8px; display: none; text-align: center; }
+  .divider { height: 1px; background: #2a2a2a; margin: 24px 0; }
+  .note { font-size: 12px; color: #555; text-align: center; line-height: 1.5; }
+  .already-open { background: #1f2937; border: 1px solid #374151; border-radius: 10px; padding: 14px; font-size: 13px; color: #9ca3af; line-height: 1.6; margin-bottom: 16px; display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Nexus <span>×</span> Uzum</div>
+  <div class="subtitle">Подключите ваш магазин за 3 шага</div>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-text">Откройте <b>seller.uzum.uz</b> и войдите в ваш аккаунт продавца</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-text">Вернитесь на эту страницу и нажмите кнопку ниже — токен извлечётся автоматически</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-text">Скопируйте токен и отправьте боту <b>Nexus</b> командой <b>/settoken</b></div>
+  </div>
+
+  <div class="already-open" id="alreadyMsg">
+    ✅ <b>Вы уже открывали seller.uzum.uz</b> — можно нажать кнопку!
+  </div>
+
+  <button class="btn-main" id="extractBtn" onclick="extractToken()">
+    🔑 Получить токен автоматически
+  </button>
+
+  <div class="result-box" id="resultBox">
+    <div class="result-label" id="resultLabel">Ваш токен Uzum Market:</div>
+    <div class="result-token" id="tokenText">—</div>
+    <button class="btn-copy" id="copyBtn" onclick="handleCopy()">📋 Скопировать токен</button>
+    <div class="status" id="copyStatus"></div>
+  </div>
+
+  <div class="divider"></div>
+  <p class="note">Токен хранится только в вашем браузере. Мы не передаём его третьим лицам.</p>
+</div>
+
+<script>
+const UZUM_KEYS = ['access_token','accessToken','token','authToken','auth_token','uzum_token','seller_token','jwt','userToken','sellerAccessToken'];
+
+function tryLocalStorage() {
+  try {
+    for (const key of UZUM_KEYS) {
+      const val = localStorage.getItem(key);
+      if (val && val.length > 20) return val;
+    }
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const val = localStorage.getItem(key);
+      if (val && (val.startsWith('eyJ') || val.length > 100) && !val.startsWith('{')) return val;
+      try {
+        const p = JSON.parse(val);
+        if (p && (p.access_token || p.token || p.accessToken)) return p.access_token || p.token || p.accessToken;
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return null;
+}
+
+function extractToken() {
+  const btn = document.getElementById('extractBtn');
+  btn.textContent = '⏳ Извлекаю...';
+  btn.disabled = true;
+
+  setTimeout(() => {
+    btn.textContent = '🔑 Получить токен автоматически';
+    btn.disabled = false;
+    const token = tryLocalStorage();
+    if (token) {
+      showToken(token.replace(/^Bearer\s+/i, ''));
+    } else {
+      showManual();
+    }
+  }, 800);
+}
+
+function showToken(token) {
+  window._token = token;
+  document.getElementById('resultLabel').textContent = 'Ваш токен Uzum Market:';
+  document.getElementById('tokenText').textContent = token.slice(0,44) + '...' + token.slice(-8);
+  document.getElementById('copyBtn').textContent = '📋 Скопировать и отправить боту';
+  document.getElementById('resultBox').style.display = 'block';
+  window._mode = 'token';
+}
+
+function showManual() {
+  const CONSOLE_CODE = "copy(Object.entries(localStorage).find(([k,v])=>v&&v.length>50&&!v.startsWith('{'))?.[1]||'not found')";
+  window._consoleCode = CONSOLE_CODE;
+  document.getElementById('resultLabel').textContent = 'Автоматически не удалось. Сделайте вручную:';
+  document.getElementById('tokenText').innerHTML =
+    '<b style="color:#fff">1.</b> Откройте <b style="color:#fff">seller.uzum.uz</b> (войдите в аккаунт)<br>' +
+    '<b style="color:#fff">2.</b> Нажмите <b style="color:#fff">F12</b> → вкладка <b style="color:#fff">Console</b><br>' +
+    '<b style="color:#fff">3.</b> Нажмите кнопку ниже — код скопируется<br>' +
+    '<b style="color:#fff">4.</b> Вставьте в Console и нажмите <b style="color:#fff">Enter</b><br>' +
+    '<b style="color:#fff">5.</b> Токен скопируется — отправьте боту: <b style="color:#a78bfa">/settoken токен</b>';
+  document.getElementById('copyBtn').textContent = '📋 Скопировать код для Console';
+  document.getElementById('resultBox').style.display = 'block';
+  window._mode = 'manual';
+}
+
+function handleCopy() {
+  if (window._mode === 'token') {
+    navigator.clipboard.writeText('/settoken ' + window._token).then(() => {
+      showStatus('✅ Скопировано! Откройте бота Nexus и вставьте (Ctrl+V)');
+    });
+  } else {
+    navigator.clipboard.writeText(window._consoleCode).then(() => {
+      showStatus('✅ Код скопирован! Вставьте в Console на seller.uzum.uz и нажмите Enter');
+    });
+  }
+}
+
+function showStatus(msg) {
+  const s = document.getElementById('copyStatus');
+  s.textContent = msg;
+  s.style.display = 'block';
+}
+
+window.onload = function() {
+  if (tryLocalStorage()) document.getElementById('alreadyMsg').style.display = 'block';
+};
+</script>
+</body>
+</html>
